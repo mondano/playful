@@ -1,0 +1,53 @@
+Logger:
+
+  while (true) {
+    yield {
+      wait: () => true,
+    };
+    console.log(this.lastEvent());
+  }
+
+
+Stylizer:
+
+const element = document.getElementById("canvas").createElement('hi');
+while (true) {
+    const randomColor = () => Math.floor(Math.random() * 256);
+  yield element.style.backgroundColor = `rgb(${randomColor()}, ${randomColor()}, ${randomColor()})`;
+}
+
+
+const canvas = document.getElementById("canvas");
+const element = canvas.createElement(uuid())
+while (true) {
+    const randomColor = () => Math.floor(Math.random() * 256);
+  yield element.style.backgroundColor = `rgb(${randomColor()}, ${randomColor()}, ${randomColor()})`;
+}
+
+// Define the stylizer generator function
+function stylizer(element, styleUpdater) {
+  if (!element || !styleUpdater) {
+    throw new Error("Both element and styleUpdater must be provided");
+  }
+
+  function updateStyle(timestamp) {
+    // Update the style of the element using the styleUpdater function
+    styleUpdater(element);
+
+    // Request the next animation frame
+    requestAnimationFrame(updateStyle);
+  }
+
+  // Start the animation loop
+  requestAnimationFrame(updateStyle);
+}
+
+// Example usage
+// Define a styleUpdater function to update the style of the element
+function randomColorStyleUpdater(element) {
+  const randomColor = () => Math.floor(Math.random() * 256);
+  element.style.backgroundColor = `rgb(${randomColor()}, ${randomColor()}, ${randomColor()})`;
+}
+
+// Apply the stylizer to the element
+stylizer(element, randomColorStyleUpdater);

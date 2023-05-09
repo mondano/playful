@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Play!</title>
+    <style>
+      .card {
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin: 5px;
+        display: inline-block;
+        cursor: move;
+        background-color: #ffffff;
+      }
+      #cardPool {
+        border: 2px dashed #ccc;
+        padding: 10px;
+        margin: 5px;
+        display: inline-block;
+        background-color: #fffddf;
+        min-width: 200px;
+        min-height: 200px;
+      }
+      #visualArray {
+        border: 2px dashed #ccc;
+        padding: 10px;
+        margin: 5px;
+        display: inline-block;
+        background-color: #bfffda;
+        min-width: 200px;
+        min-height: 200px;
+      }
+      #playerDeck {
+        border: 2px dashed #ccc;
+        padding: 10px;
+        margin: 5px;
+        display: inline-block;
+        background-color: #ebdfff;
+        min-width: 200px;
+        min-height: 200px;
+      }
+      #playButton {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 5px;
+        border: 1px solid #ccc;
+        background-color: #e7e7e7;
+        cursor: pointer;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cardPool"></div>
+    <div id="playerDeck"></div>
+    <div id="visualArray"></div>
+    <button id="playButton">Play</button>
+    <button id="backButton">Back</button>
+
+    <script>
+      let view = new Map();
+      let ids = new Map(); //key unique-string UUID -> value: obj-reference
+      // we only need this insofar as we are dealing with the DOM
+      let viewStack = [];
+
+      function changeview(key, currentView) {
+        const newView = currentView.get(key);
+        console.log("NEW VIEW", newView);
+        if (newView instanceof Map) {
+          viewStack.push(view);
+          view = newView;
+        }
+      }
+
+      function goBack(containerId) {
+        if (viewStack.length > 0) {
+          view = viewStack.pop();
+          renderCards(view, containerId);
+        }
+      }
+
+      // Initialize map-graph structure
+      let animal = new Map();
+      let genetics = (x) => {
+        return x;
+      };
+      let biology = new Map();
+      let science = new Map();
+      let norm = new Map();
+      let computing = new Map();
+      let philosophy = new Map();
+      let technology = new Map();
+
+      // Initialize map-graph structure
+      const categories = [
+        [science, "scripts", genetics, "inputs"],
+        [science, "new category"],
+        [biology, "Play!", "XORG"],
+        [biology, "Play!", "Filter"],
+        [biology, "Play!", "Style"],
+      ];
+
+      // we only need to do this to bootstrap?:
+      (async () => {
+        let i = 0;
+        const containerId = "cardPool";
+        for (const category of categories) {
+          for await (const map of thread(...category)) {
+            if (!view.has(i)) {
+              view.set(i, map);
+              i++;
+            }
+            console.log(map);
+          }
+        }
+        renderCards(view, containerId);
+      })();
+
+      async function* thread(map, ...paths) {
+        map = await map;
+        let initmap = await map;
+        for await (const path of paths) {
+          if (map instanceof Map) {
+            if (!map.has(path)) {
+              map.set(path, new Map());
+            }
+            map = map.get(path);
+          } else {
+            return console.log("map variable is not instanceof Map");
+          }
+        }
+        yield initmap;
+      }
+
+      // we want to make this a specific rendering function
+      // instead of being global it should go inside of a map
+      // under "renderer"
+      function renderCards(map, containerId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = "";
+
+        for (const [key, mapValue] of map.entries()) {
+          const card = createCard(key, mapValue, map, containerId);
+          container.appendChild(card);
+        }
+
+        container.addEventListener("dragover", dragover_handler);
+        container.addEventListener("drop", drop_handler);
+      }
+
+      function createCard(key, mapValue, parentmap, containerId) {
+        const card = document.createElement("div");
+        card.textContent = `${key} :: ${typeof key}`;
+        if (mapValue instanceof Map && mapValue.size > 0) {
+          const entriesList = document.createElement("ul");
+
+          for (const [entryKey, entryValue] of mapValue.entries()) {
+            console.log("entryKey:", entryKey, "entryVal:", entryValue);
+            const nestedCard = createCard(
+              entryKey,
+              entryValue,
+              parentmap,
+              containerId
+            );
+            entriesList.appendChild(nestedCard);
+          }
+
+          card.appendChild(entriesList);
+        }
+        card.id = toString(key);
+        ids.set(card, { parentmap, key });
+
+        card.classList.add("card");
+        card.draggable = true;
+        card.addEventListener("dragstart", dragstart_handler); // this is all very specific
+        card.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          changeview(key, view);
+          renderCards(view, containerId);
+        });
+
+        card.addEventListener("dragenter", () => {
+          card.classList.add("card-highlight");
+        });
+        card.addEventListener("dragleave", () => {
+          card.classList.remove("card-highlight");
+        });
+
+        return card;
+      }
+
+      function dragstart_handler(ev) {
+        ev.dataTransfer.setData("text/plain", ev.target.id);
+      }
+
+      function dragover_handler(ev) {
+        ev.preventDefault();
+      }
+      function findPath(currentMap, targetKey, currentPath = []) {
+        if (currentMap.has(targetKey)) {
+          return [...currentPath, targetKey];
+        }
+
+        for (const [key, value] of currentMap.entries()) {
+          if (value instanceof Map) {
+            const path = findPath(value, targetKey, [...currentPath, key]);
+            if (path) {
+              return path;
+            }
+          }
+        }
+
+        return null;
+      }
+
+      function drop_handler(ev) {
+        ev.preventDefault();
+        const id = ev.dataTransfer.getData("text/plain");
+        const card = document.getElementById(id);
+        const { parentmap, key } = ids.get(card); // get the parent Map and key of the moved card from the ids Map
+        ev.target.appendChild(card);
+        const newParent = ev.target; // get the new parent element
+        const newParentId = newParent.id; // get the id of the new parent element
+        const { parentmap: newparentmap, key: newkey } = ids.get(newParent); // get the parent Map and key of the new parent element
+
+        // remove the card from its old position in the parent Map
+        parentmap.delete(key);
+
+        // update the ids map with the new parent map and key
+        ids.set(card, { parentmap: newparentmap, key: newkey });
+
+        renderCards(view, newParentId); // re-render the cards in the new parent element
+      }
+
+      async function* nav(...paths) {
+        let map = paths.shift();
+        for await (const path of paths) {
+          if (map instanceof Map) {
+            if (!map.has(path)) {
+              map.set(path, new Map());
+            }
+            map = map.get(path);
+          }
+          yield map;
+        }
+      }
+
+      function initializeDeckBuilder() {
+        const cardPool = document.getElementById("cardPool");
+        const playerDeck = document.getElementById("playerDeck");
+        //const visualArray = document.getElementById("visualArray");
+        //const playButton = document.getElementById("playButton");
+        document
+          .getElementById("backButton")
+          .addEventListener("click", () => goBack("cardPool"));
+        cardPool.id = "cardPool";
+        playerDeck.id = "playerDeck";
+        //visualArray.id = "visualArray";
+
+        cardPool.addEventListener("dragover", dragover_handler);
+        playerDeck.addEventListener("dragover", dragover_handler);
+        //visualArray.addEventListener("dragover", dragover_handler);
+
+        cardPool.addEventListener("drop", drop_handler);
+        playerDeck.addEventListener("drop", drop_handler);
+        //visualArray.addEventListener("drop", drop_handler);
+      }
+
+      initializeDeckBuilder();
+    </script>
+  </body>
+</html>
